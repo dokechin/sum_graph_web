@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<!-- jQuery -->
+<!--script src="http://code.jquery.com/jquery-1.12.0.min.js"></script-->
+<!-- d3.js -->
+<script src="d3.min.js" charset="utf-8"></script>
+
+<title>Sum Graph</title>
+
+<body>
+<input type="button" onclick="drillUp()" value="drillup"/>
+<input type="button" onclick="drillDown()" value="drilldown"/>
+<p></p>
+<script type="text/javascript">
+
+var size = { 
+    width : 800,
+    height : 700
+};
+var margin = {
+    top : 40,
+    right : 40,
+    bottom : 80,
+    left : 70
+};
+
+var detail_level = 0;
+var start = [null,null,null,null,null,null,null];
+var end   = [null,null,null,null,null,null,null];
+
+var xScale = d3.scaleTime()
+    .range ([0 , size.width - margin.left - margin.right]);
+var yScale = d3.scaleLinear()
+    .range ([size.height - margin.top - margin.bottom, 0]);
+var zScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+var line = d3.line()
+    .curve(d3.curveBasis)
+        .x(function(d) { return xScale(d.timestamp); })
+        .y(function(d) { return yScale(d.value); });
+
+var svg = d3.select("body")
+    .append("svg")
+    .attr("width", size.width)
+    .attr("height", size.height)
+    .append("g")
+    .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
+
+svg.append("g")
+   .attr("class", "axisX")
+   .attr("transform", "translate(0," + 
+        (size.height - margin.top - margin.bottom) + ")")
+   .call(d3.axisBottom(xScale));
+
+svg.append("g")
+    .attr("class", "axisY")
+    .call(d3.axisLeft(yScale));
+
+svg.append("g")
+    .attr("class", "brush")
+    .call(d3.brushX().on("brush", brushed));
+
+var dataurl = "/sumgraph";
+var UNITS = [
+    "year", 
+    "month", 
+    "day", 
+    "hour", 
+    "minute" , 
+    "second"
+];
+var PARSE_STRINGS = [
+    "%Y", 
+    "%Y-%m", 
+    "%Y-%m-%d",
+    "%Y-%m-%d %H", 
+    "%Y-%m-%d %H:%M" , 
+    "%Y-%m-%d %H:%M:%S"
+];
+
+var series = [];
+
+function brushed(){
+    var selected = d3.event.selection.map(xScale.invert);
+    var func = d3.timeFormat(PARSE_STRINGS[detail_level + 1]);
+    start[detail_level+1] = func(selected[0]);
+    end[detail_level+1] = func(selected[1]);
+}
+
+function drillDown(){
+    if (detail_level < UNITS.length - 1){
+        detail_level++;
+        update();
+    }
+}
+
+function drillUp(){
+    if (detail_level > 0){
+        detail_level--;
+        update();
+    }
+}
+
+function update(){
+   
+    var param = {"unit" : UNITS[detail_level]};
+    if (start[detail_level] && end[detail_level]){
+        param.start = start[detail_level];
+        param.end = end[detail_level];
+    }
+    console.log(param);
+    d3.json(dataurl)
+        .header("Content-Type", "application/json")
+        .post(JSON.stringify(param), function(error, datas) {
+
+        // save start and end 
+        var return_level = (datas[0].timestamp.length-4) /3;
+        var original_start = start[detail_level];
+        var original_end = end[detail_level];
+        while (detail_level  <  return_level){
+            start[detail_level] = original_start;
+            end[detail_level] = original_end;
+            detail_level++;
+        };
+          
+        var parseDate = d3.timeParse(PARSE_STRINGS[detail_level]);
+
+        datas.forEach(function(d){
+            for (var key in d){
+                if (key == "timestamp"){
+                    d[key] = parseDate(d[key]);
+                }
+                else{
+                    d[key] = +d[key];
+                }
+           }
+        });
+        series = Object.keys(datas[0])
+            .filter(function(d){ return d!= "timestamp"})
+            .map(function(id){
+                return { 
+                    id :id,
+                    values : datas.map(function (d){
+                        return {timestamp: d.timestamp, value: d[id]};
+                    })
+                };
+        });
+        console.log(series);
+
+        xScale.domain(d3.extent(datas, function(d){ return d.timestamp;})); 
+        console.log(datas);
+        yScale.domain([
+            0,
+            d3.max(series, 
+              function(c){return d3.max(c.values, 
+                                        function(d) { return d.value;}); })
+            ]);
+       
+        // Add the X Axis
+        svg.select(".axisX")
+          .attr("transform", "translate(0," + 
+            (size.height - margin.top - margin.bottom) + ")")
+          .call(d3.axisBottom(xScale)
+              .tickFormat( function (d) { 
+                  var func = d3.timeFormat(PARSE_STRINGS[detail_level]);
+                  return func(d);
+              }))
+          .selectAll("text")   
+          .style("text-anchor", "end")
+          .attr("dx", "-.8em")
+          .attr("dy", ".15em")
+          .attr("transform", function(d) {
+              return "rotate(-65)" 
+          });
+        svg.selectAll(".axisY")
+          .call(d3.axisLeft(yScale));
+
+        var graph = svg.selectAll(".graph")
+          .data(series);
+
+        var graph_enter = graph.enter()
+            .append("g")
+            .attr("class", "graph");
+
+        graph_enter
+          .append("path")
+          .attr("class", "line")
+          .attr("d", function(d) { return line(d.values); })
+          .style("stroke", function(d) { return zScale(d.id); })
+          .style("fill", "none");
+        
+        graph_enter.append("text")
+             .datum(function(d) { return {id: d.id, value: d.values[d.values.length - 1]}; })
+             .attr("transform", function(d) { return "translate(" + xScale(d.value.timestamp) + "," + yScale(d.value.value) + ")"; })
+             .attr("x", 3)
+             .attr("dy", "0.35em")
+             .attr("class", "label")
+             .style("font", "10px sans-serif")
+             .text(function(d) { return d.id; });
+
+        graph.select(".line")
+            .attr("d", function(d) { return line(d.values); })
+            .style("stroke", function(d) { return zScale(d.id); })
+            .style("fill", "none");
+
+        graph.select(".label")
+             .datum(function(d) { return {id: d.id, value: d.values[d.values.length - 1]}; })
+             .attr("transform", function(d) { return "translate(" + xScale(d.value.timestamp) + "," + yScale(d.value.value) + ")"; })
+             .attr("x", 3)
+             .attr("dy", "0.35em")
+             .style("font", "10px sans-serif")
+             .text(function(d) { return d.id; });
+    });
+}
+window.addEventListener('load', function () {
+    update();
+});
+</script>
+</body>
+</html>
