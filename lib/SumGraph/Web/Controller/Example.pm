@@ -9,13 +9,6 @@ sub index {
   $self->reply->static('index.html');
 }
 
-# This action will render a template
-sub index2 {
-  my $self = shift;
-  # Render template "example/index.html.ep" with message
-  $self->reply->static('index2.html');
-}
-
 sub sumgraph {
   my $self = shift;
   
