@@ -4,7 +4,7 @@ use Data::Dumper;
 use JSON;
 
 my @datas = ();
-my $time = time - (3600 * 24 * 365 * 3); 
+my $time = time - (3600 * 24 * 10); 
 while ($time < time){
     my ($sec, $min, $hour, $day,$month,$year) = (localtime($time))[0,1,2,3,4,5];
     my $timestamp = sprintf("%04d-%02d-%02d %02d:%02d:%02d", 

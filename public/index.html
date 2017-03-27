@@ -115,6 +115,14 @@ function update(){
         .header("Content-Type", "application/json")
         .post(JSON.stringify(param), function(error, datas) {
 
+        if (!isArray(datas)){
+            datas = [datas];
+        }
+        if (datas.length == 0){
+          alert("data not found");
+          return;
+        }
+
         // save start and end 
         var return_level = (datas[0].timestamp.length-4) /3;
         var original_start = start[detail_level];
@@ -217,6 +225,14 @@ function update(){
 window.addEventListener('load', function () {
     update();
 });
+
+function callToString(o){
+    return Object.prototype.toString.call(o);
+}
+
+function isArray(o){
+    return Object.prototype.toString.call(o) === '[object Array]';
+}
 </script>
 </body>
 </html>

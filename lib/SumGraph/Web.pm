@@ -13,6 +13,7 @@ sub startup {
   my $r = $self->routes;
 
   $r->get('/')->to('example#index');
+  $r->get('/index2')->to('example#index2');
   $r->post('/sumgraph')->to('example#sumgraph');
 }
 

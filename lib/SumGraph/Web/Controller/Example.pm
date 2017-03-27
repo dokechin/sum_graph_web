@@ -9,6 +9,13 @@ sub index {
   $self->reply->static('index.html');
 }
 
+# This action will render a template
+sub index2 {
+  my $self = shift;
+  # Render template "example/index.html.ep" with message
+  $self->reply->static('index2.html');
+}
+
 sub sumgraph {
   my $self = shift;
   
@@ -65,7 +72,7 @@ sub sumgraph {
     print Dumper(@ret);
     my $ret_len = scalar @ret;
     $len = $len + 3;
-    if ($len > 19 || $ret_len > 1) {
+    if ($len > 19 || $ret_len >= 1) {
       last;
     }
   } 
